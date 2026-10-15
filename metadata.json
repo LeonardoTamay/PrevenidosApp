@@ -1,0 +1,8 @@
+{
+  "name": "Prevenidos",
+  "description": "Sistema de confirmación del estado de la población y plataforma de respuesta y monitoreo post-sismo.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
