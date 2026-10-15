@@ -1,0 +1,10 @@
+{
+  "description": "This platform allows citizens to report their safety status after an earthquake and enables emergency personnel to monitor and manage responses effectively.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
