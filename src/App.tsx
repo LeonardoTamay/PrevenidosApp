@@ -206,6 +206,14 @@ function CitizenApp({
 
   return <div className="citizen-page">
     <div className="citizen-phone">
+      <div className="mobile-status-bar" aria-hidden="true">
+        <span className="mobile-status-time">10:48</span>
+        <div className="mobile-status-speaker" />
+        <div className="mobile-status-icons">
+          <Icon name="signal" size={13} />
+          <span className="mobile-status-battery" />
+        </div>
+      </div>
       <header className="citizen-header">
         <button className="brand-button" onClick={restart} aria-label="Ir al inicio"><Brand compact /></button>
         <button className="exit-button" onClick={onExit}>Salir</button>
@@ -214,8 +222,20 @@ function CitizenApp({
         {screen === "home" && <>
           <div className="citizen-intro"><span className="demo-label">DEMOSTRACIÓN</span><h1>Confirmación de estado</h1><p>Después del sismo, informa cómo te encuentras.</p></div>
           <div className="emergency-actions">
-            <Button variant="safe" icon="check" onClick={() => setScreen("safe")}><span><strong>ESTOY A SALVO</strong><small>Confirmar que no necesitas ayuda</small></span></Button>
-            <Button variant="danger" icon="alert" onClick={() => setScreen("help")}><span><strong>NECESITO AYUDA</strong><small>Informar una necesidad urgente</small></span></Button>
+            <button type="button" className="emergency-btn safe" onClick={() => setScreen("safe")}>
+              <span className="emergency-btn-icon"><Icon name="check" size={20} /></span>
+              <span className="emergency-btn-text">
+                <strong>ESTOY A SALVO</strong>
+                <small>Confirmar que no necesitas ayuda</small>
+              </span>
+            </button>
+            <button type="button" className="emergency-btn danger" onClick={() => setScreen("help")}>
+              <span className="emergency-btn-icon"><Icon name="alert" size={20} /></span>
+              <span className="emergency-btn-text">
+                <strong>NECESITO AYUDA</strong>
+                <small>Informar una necesidad urgente</small>
+              </span>
+            </button>
           </div>
           <ConnectionNotice />
           <Button variant="ghost" icon="reports" onClick={() => { setTrackingOrigin("home"); setScreen("tracking"); }}>Consultar mi reporte</Button>
