@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode, type SVGProps } from "react";
+import { useEffect, useMemo, useState, type ReactNode, type SVGProps } from "react";
+import { toPng } from "html-to-image";
 
 type IconName =
   | "activity"
@@ -6,11 +7,18 @@ type IconName =
   | "arrow"
   | "building"
   | "calendar"
+  | "camera"
   | "check"
   | "chevron"
+  | "chevronLeft"
+  | "chevronRight"
   | "clock"
   | "close"
   | "database"
+  | "download"
+  | "expand"
+  | "eye"
+  | "eyeOff"
   | "filter"
   | "help"
   | "history"
@@ -36,11 +44,18 @@ const iconPaths: Record<IconName, ReactNode> = {
   arrow: <><path d="m9 18 6-6-6-6" /></>,
   building: <><path d="M4 21V5l8-3 8 3v16M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01M2 21h20" /></>,
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 11h18" /></>,
+  camera: <><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></>,
   check: <><path d="m5 12 4 4L19 6" /></>,
   chevron: <><path d="m9 18 6-6-6-6" /></>,
+  chevronLeft: <><path d="m15 18-6-6 6-6" /></>,
+  chevronRight: <><path d="m9 18 6-6-6-6" /></>,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   close: <><path d="m6 6 12 12M18 6 6 18" /></>,
   database: <><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7" /></>,
+  download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+  expand: <><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></>,
+  eye: <><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></>,
+  eyeOff: <><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61M2 2l20 20"/></>,
   filter: <><path d="M4 5h16M7 12h10M10 19h4" /></>,
   help: <><circle cx="12" cy="12" r="9" /><path d="M9.8 9a2.3 2.3 0 1 1 3.4 2c-.8.5-1.2 1-1.2 2M12 17h.01" /></>,
   history: <><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></>,
@@ -160,12 +175,32 @@ function LocationPicker({ location, setLocation }: { location: "none" | "device"
   </section>;
 }
 
-function CitizenApp({ onExit }: { onExit: () => void }) {
-  const [screen, setScreen] = useState<CitizenScreen>("home");
-  const [category, setCategory] = useState("");
-  const [location, setLocation] = useState<"none" | "device" | "map">("none");
-  const [resultType, setResultType] = useState<"safe" | "help">("safe");
+function CitizenApp({
+  onExit,
+  initialScreen = "home",
+  initialCategory = "",
+  initialLocation = "none",
+  initialResultType = "safe",
+}: {
+  onExit: () => void;
+  initialScreen?: CitizenScreen;
+  initialCategory?: string;
+  initialLocation?: "none" | "device" | "map";
+  initialResultType?: "safe" | "help";
+}) {
+  const [screen, setScreen] = useState<CitizenScreen>(initialScreen);
+  const [category, setCategory] = useState(initialCategory);
+  const [location, setLocation] = useState<"none" | "device" | "map">(initialLocation);
+  const [resultType, setResultType] = useState<"safe" | "help">(initialResultType);
   const [trackingOrigin, setTrackingOrigin] = useState<"home" | "result">("home");
+
+  useEffect(() => {
+    setScreen(initialScreen);
+    setCategory(initialCategory || (initialScreen === "help" ? "Atención médica" : ""));
+    setLocation(initialLocation !== "none" ? initialLocation : (initialScreen === "safe" || initialScreen === "help" ? "device" : "none"));
+    setResultType(initialResultType);
+  }, [initialScreen, initialCategory, initialLocation, initialResultType]);
+
   const submit = (type: "safe" | "help") => { setResultType(type); setScreen("result"); };
   const restart = () => { setScreen("home"); setCategory(""); setLocation("none"); };
 
@@ -261,15 +296,31 @@ const navItems: { id: View; label: string; icon: IconName }[] = [
   { id: "history", label: "Historial", icon: "history" },
 ];
 
-function Dashboard({ onExit }: { onExit: () => void }) {
-  const [view, setView] = useState<View>("summary");
+function Dashboard({
+  onExit,
+  initialView = "summary",
+  initialSelected = null,
+  fullPanel = false,
+}: {
+  onExit: () => void;
+  initialView?: View;
+  initialSelected?: Report | null;
+  fullPanel?: boolean;
+}) {
+  const [view, setView] = useState<View>(initialView);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [status, setStatus] = useState("Todos");
   const [transmission, setTransmission] = useState("Todos");
   const [node, setNode] = useState("Todos");
   const [validation, setValidation] = useState("Todos");
-  const [selected, setSelected] = useState<Report | null>(null);
+  const [selected, setSelected] = useState<Report | null>(initialSelected);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setView(initialView);
+    setSelected(initialSelected);
+  }, [initialView, initialSelected]);
+
   const filtered = useMemo(() => reports.filter((r) =>
     (status === "Todos" || r.state === status) &&
     (transmission === "Todos" || r.transmission === transmission) &&
@@ -280,7 +331,7 @@ function Dashboard({ onExit }: { onExit: () => void }) {
   const setCurrentView = (next: View) => { setView(next); setSidebarOpen(false); };
   const title = navItems.find((n) => n.id === view)?.label;
 
-  return <div className="dashboard">
+  return <div className={`dashboard ${fullPanel ? "full-panel-mode" : ""}`}>
     {sidebarOpen && <button className="sidebar-overlay" aria-label="Cerrar menú" onClick={() => setSidebarOpen(false)} />}
     <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
       <div className="sidebar-brand"><Brand /></div>
@@ -304,7 +355,7 @@ function Dashboard({ onExit }: { onExit: () => void }) {
 }
 
 function MetricCard({ label, value, icon, tone, note }: { label: string; value: number; icon: IconName; tone: string; note: string }) {
-  return <article className={`metric-card metric-${tone}`}><div className="metric-top"><span>{label}</span><i><Icon name={icon} /></i></div><strong>{value}</strong><small>{note}</small></article>;
+  return <article className={`metric-card metric-${tone}`}><div className="metric-top"><span>{label}</span><i><Icon name={icon} /></i></div><strong className="tabular-nums">{value}</strong><small>{note}</small></article>;
 }
 
 function SummaryView({ onNavigate, setSelected }: { onNavigate: (v: View) => void; setSelected: (r: Report) => void }) {
@@ -395,7 +446,7 @@ function ReportDetail({ report, onClose }: { report: Report; onClose?: () => voi
 }
 
 function ReportRows({ reports: rows, selected, onSelect }: { reports: Report[]; selected: Report | null; onSelect: (r: Report) => void }) {
-  return <div className="report-table-wrap"><table className="report-table"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Estado declarado</th><th>Ubicación</th><th>Fuente</th><th>Transmisión</th><th>Validación</th><th /></tr></thead><tbody>{rows.map((r) => <tr key={r.id} className={selected?.id === r.id ? "selected" : ""} onClick={() => onSelect(r)}><td><strong>{r.id}</strong></td><td>{r.date.replace("17 jun 2025 · ", "")}</td><td><StatusPill tone={stateTone(r)}>{r.state}</StatusPill></td><td><span className="location-cell"><Icon name="location" size={15} />{r.location}</span></td><td>{r.source}</td><td><StatusPill tone={transmissionTone(r.transmission)}>{r.transmission}</StatusPill></td><td><StatusPill tone={validationTone(r.validation)}>{r.validation}</StatusPill></td><td><button aria-label={`Ver ${r.id}`} onClick={(e) => { e.stopPropagation(); onSelect(r); }}><Icon name="chevron" size={17} /></button></td></tr>)}</tbody></table></div>;
+  return <div className="report-table-wrap"><table className="report-table"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Estado declarado</th><th>Ubicación</th><th>Fuente</th><th>Transmisión</th><th>Validación</th><th /></tr></thead><tbody>{rows.map((r) => <tr key={r.id} className={selected?.id === r.id ? "selected" : ""} onClick={() => onSelect(r)}><td><strong>{r.id}</strong></td><td className="tabular-nums">{r.date.replace("17 jun 2025 · ", "")}</td><td><StatusPill tone={stateTone(r)}>{r.state}</StatusPill></td><td><span className="location-cell"><Icon name="location" size={15} />{r.location}</span></td><td>{r.source}</td><td><StatusPill tone={transmissionTone(r.transmission)}>{r.transmission}</StatusPill></td><td><StatusPill tone={validationTone(r.validation)}>{r.validation}</StatusPill></td><td><button aria-label={`Ver ${r.id}`} onClick={(e) => { e.stopPropagation(); onSelect(r); }}><Icon name="chevron" size={17} /></button></td></tr>)}</tbody></table></div>;
 }
 
 function ReportsView({ filtered, selected, setSelected, status, setStatus }: { filtered: Report[]; selected: Report | null; setSelected: (r: Report | null) => void; status: string; setStatus: (v: string) => void }) {
@@ -415,7 +466,7 @@ function ReportsView({ filtered, selected, setSelected, status, setStatus }: { f
 }
 
 function NodesView() {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>("NOD-LIM-01");
   const nodeDetails: Record<string, { log: string[]; quality: number }> = {
     "NOD-LIM-01": { log: ["10:32 — 3 reportes recibidos", "10:15 — Sincronización correcta", "09:58 — Reconexión exitosa"], quality: 87 },
     "NOD-LIM-02": { log: ["10:38 — 4 reportes recibidos", "10:22 — Sincronización correcta", "10:05 — Sin incidencias"], quality: 94 },
@@ -452,10 +503,249 @@ function HistoryView() {
   </>;
 }
 
+/* =========================================================================
+   SISTEMA DE ASISTENCIA Y CAPTURA DE PANTALLAS (SCREENSHOT SUITE)
+   ========================================================================= */
+
+type ScreenKey =
+  | "gateway"
+  | "citizen-home"
+  | "citizen-safe"
+  | "citizen-help"
+  | "citizen-result"
+  | "citizen-tracking"
+  | "operator-login"
+  | "dashboard-summary"
+  | "dashboard-map"
+  | "dashboard-map-detail"
+  | "dashboard-reports"
+  | "dashboard-nodes"
+  | "dashboard-history";
+
+interface ScreenCatalogItem {
+  key: ScreenKey;
+  group: "Portal de Selección" | "Móvil Ciudadano (360-430 px)" | "Escritorio Dashboard COEN (1440 px)";
+  name: string;
+  filename: string;
+  isDashboard?: boolean;
+}
+
+const screenCatalog: ScreenCatalogItem[] = [
+  { key: "gateway", group: "Portal de Selección", name: "Portal de Acceso", filename: "01_portal_acceso" },
+  { key: "citizen-home", group: "Móvil Ciudadano (360-430 px)", name: "1. Inicio Emergencia", filename: "02_movil_ciudadano_inicio" },
+  { key: "citizen-safe", group: "Móvil Ciudadano (360-430 px)", name: "2. Confirmar 'Estoy a salvo'", filename: "03_movil_ciudadano_a_salvo" },
+  { key: "citizen-help", group: "Móvil Ciudadano (360-430 px)", name: "3. Solicitud de Ayuda", filename: "04_movil_ciudadano_solicitud_ayuda" },
+  { key: "citizen-result", group: "Móvil Ciudadano (360-430 px)", name: "4. Comprobante de Reporte", filename: "05_movil_ciudadano_comprobante" },
+  { key: "citizen-tracking", group: "Móvil Ciudadano (360-430 px)", name: "5. Trazabilidad / Seguimiento", filename: "06_movil_ciudadano_seguimiento" },
+  { key: "operator-login", group: "Escritorio Dashboard COEN (1440 px)", name: "6. Login Operador COEN", filename: "07_escritorio_operador_login" },
+  { key: "dashboard-summary", group: "Escritorio Dashboard COEN (1440 px)", name: "7. Dashboard: Resumen General", filename: "08_escritorio_dashboard_resumen", isDashboard: true },
+  { key: "dashboard-map", group: "Escritorio Dashboard COEN (1440 px)", name: "8. Dashboard: Mapa Georreferenciado", filename: "09_escritorio_dashboard_mapa", isDashboard: true },
+  { key: "dashboard-map-detail", group: "Escritorio Dashboard COEN (1440 px)", name: "9. Dashboard: Mapa con Detalle", filename: "10_escritorio_dashboard_mapa_detalle", isDashboard: true },
+  { key: "dashboard-reports", group: "Escritorio Dashboard COEN (1440 px)", name: "10. Dashboard: Reportes Consolidados", filename: "11_escritorio_dashboard_reportes", isDashboard: true },
+  { key: "dashboard-nodes", group: "Escritorio Dashboard COEN (1440 px)", name: "11. Dashboard: Nodos y Conectividad", filename: "12_escritorio_dashboard_nodos", isDashboard: true },
+  { key: "dashboard-history", group: "Escritorio Dashboard COEN (1440 px)", name: "12. Dashboard: Historial de Eventos", filename: "13_escritorio_dashboard_historial", isDashboard: true },
+];
+
 export default function App() {
-  const [mode, setMode] = useState<"gateway" | "citizen" | "login" | "dashboard">("gateway");
-  if (mode === "citizen") return <CitizenApp onExit={() => setMode("gateway")} />;
-  if (mode === "login") return <OperatorLogin onEnter={() => setMode("dashboard")} onExit={() => setMode("gateway")} />;
-  if (mode === "dashboard") return <Dashboard onExit={() => setMode("gateway")} />;
-  return <Gateway onCitizen={() => setMode("citizen")} onOperator={() => setMode("login")} />;
+  const [screenKey, setScreenKey] = useState<ScreenKey>("gateway");
+  const [toolbarHidden, setToolbarHidden] = useState(false);
+  const [fullPanel, setFullPanel] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
+
+  // Escuchar atajo de teclado: presionar 'C' oculta o muestra el asistente para capturas manuales sin elementos superpuestos
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "SELECT" || activeEl.tagName === "TEXTAREA")) {
+        return;
+      }
+      if (e.key === "c" || e.key === "C") {
+        setToolbarHidden((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const currentIndex = screenCatalog.findIndex((s) => s.key === screenKey);
+  const currentItem = screenCatalog[currentIndex] || screenCatalog[0];
+
+  const goNext = () => {
+    if (currentIndex < screenCatalog.length - 1) {
+      setScreenKey(screenCatalog[currentIndex + 1].key);
+    }
+  };
+
+  const goPrev = () => {
+    if (currentIndex > 0) {
+      setScreenKey(screenCatalog[currentIndex - 1].key);
+    }
+  };
+
+  // Descarga automática en PNG en 2x Retina sin barra superpuesta
+  const handleDownloadPng = async () => {
+    const target = document.getElementById("capture-root");
+    if (!target) return;
+    setIsCapturing(true);
+    setDownloadSuccess(null);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const dataUrl = await toPng(target, {
+        pixelRatio: 2,
+        cacheBust: true,
+        filter: (node: HTMLElement) => {
+          return !node?.classList?.contains("capture-toolbar") && !node?.classList?.contains("capture-floating-trigger");
+        },
+      });
+
+      const link = document.createElement("a");
+      link.download = `prevenidos_${currentItem.filename}.png`;
+      link.href = dataUrl;
+      link.click();
+      setDownloadSuccess(`Guardado: prevenidos_${currentItem.filename}.png`);
+      setTimeout(() => setDownloadSuccess(null), 3000);
+    } catch (err) {
+      console.error("Error al generar captura:", err);
+    } finally {
+      setIsCapturing(false);
+    }
+  };
+
+  return (
+    <div id="capture-root" className={`capture-app-root ${fullPanel ? "full-panel-mode" : ""}`} style={{ position: "relative", minHeight: "100vh" }}>
+      {/* 1. Portal Gateway */}
+      {screenKey === "gateway" && (
+        <Gateway onCitizen={() => setScreenKey("citizen-home")} onOperator={() => setScreenKey("operator-login")} />
+      )}
+
+      {/* 2-6. Acceso Ciudadano Móvil (360-430 px) */}
+      {screenKey === "citizen-home" && (
+        <CitizenApp onExit={() => setScreenKey("gateway")} initialScreen="home" />
+      )}
+      {screenKey === "citizen-safe" && (
+        <CitizenApp onExit={() => setScreenKey("gateway")} initialScreen="safe" initialLocation="device" />
+      )}
+      {screenKey === "citizen-help" && (
+        <CitizenApp onExit={() => setScreenKey("gateway")} initialScreen="help" initialCategory="Atención médica" initialLocation="device" initialResultType="help" />
+      )}
+      {screenKey === "citizen-result" && (
+        <CitizenApp onExit={() => setScreenKey("gateway")} initialScreen="result" initialCategory="Atención médica" initialLocation="device" initialResultType="safe" />
+      )}
+      {screenKey === "citizen-tracking" && (
+        <CitizenApp onExit={() => setScreenKey("gateway")} initialScreen="tracking" initialLocation="device" />
+      )}
+
+      {/* 7. Login Operador COEN */}
+      {screenKey === "operator-login" && (
+        <OperatorLogin onEnter={() => setScreenKey("dashboard-summary")} onExit={() => setScreenKey("gateway")} />
+      )}
+
+      {/* 8-13. Dashboard Operativo COEN (Escritorio 1440 px) */}
+      {screenKey === "dashboard-summary" && (
+        <Dashboard onExit={() => setScreenKey("gateway")} initialView="summary" fullPanel={fullPanel} />
+      )}
+      {screenKey === "dashboard-map" && (
+        <Dashboard onExit={() => setScreenKey("gateway")} initialView="map" fullPanel={fullPanel} />
+      )}
+      {screenKey === "dashboard-map-detail" && (
+        <Dashboard onExit={() => setScreenKey("gateway")} initialView="map" initialSelected={reports[0]} fullPanel={fullPanel} />
+      )}
+      {screenKey === "dashboard-reports" && (
+        <Dashboard onExit={() => setScreenKey("gateway")} initialView="reports" fullPanel={fullPanel} />
+      )}
+      {screenKey === "dashboard-nodes" && (
+        <Dashboard onExit={() => setScreenKey("gateway")} initialView="nodes" fullPanel={fullPanel} />
+      )}
+      {screenKey === "dashboard-history" && (
+        <Dashboard onExit={() => setScreenKey("gateway")} initialView="history" fullPanel={fullPanel} />
+      )}
+
+      {/* Barra de Asistencia para Capturas */}
+      {!toolbarHidden && (
+        <aside className="capture-toolbar" aria-label="Asistente de capturas de pantalla">
+          <div className="capture-badge">
+            <Icon name="camera" size={16} />
+            <span>Capturas ({currentIndex + 1}/13)</span>
+          </div>
+
+          <div className="capture-nav-group">
+            <button className="capture-nav-btn" onClick={goPrev} disabled={currentIndex === 0} aria-label="Pantalla anterior" title="Pantalla anterior">
+              <Icon name="chevronLeft" size={16} />
+            </button>
+
+            <select className="capture-select" value={screenKey} onChange={(e) => setScreenKey(e.target.value as ScreenKey)}>
+              <optgroup label="Portal de Selección">
+                <option value="gateway">01. Portal de Acceso</option>
+              </optgroup>
+              <optgroup label="📱 Móvil Ciudadano (360-430 px)">
+                <option value="citizen-home">02. 1. Inicio Emergencia</option>
+                <option value="citizen-safe">03. 2. Confirmar 'Estoy a salvo'</option>
+                <option value="citizen-help">04. 3. Solicitud de Ayuda</option>
+                <option value="citizen-result">05. 4. Comprobante de Reporte</option>
+                <option value="citizen-tracking">06. 5. Trazabilidad / Seguimiento</option>
+              </optgroup>
+              <optgroup label="💻 Escritorio Dashboard COEN (1440 px)">
+                <option value="operator-login">07. 6. Login Operador COEN</option>
+                <option value="dashboard-summary">08. 7. Resumen Operativo</option>
+                <option value="dashboard-map">09. 8. Mapa Georreferenciado</option>
+                <option value="dashboard-map-detail">10. 9. Mapa con Detalle Abierto</option>
+                <option value="dashboard-reports">11. 10. Reportes Consolidados</option>
+                <option value="dashboard-nodes">12. 11. Nodos y Conectividad</option>
+                <option value="dashboard-history">13. 12. Historial de Eventos</option>
+              </optgroup>
+            </select>
+
+            <button className="capture-nav-btn" onClick={goNext} disabled={currentIndex === screenCatalog.length - 1} aria-label="Siguiente pantalla" title="Siguiente pantalla">
+              <Icon name="chevronRight" size={16} />
+            </button>
+          </div>
+
+          <div className="capture-actions">
+            {currentItem.isDashboard && (
+              <button
+                className={`capture-action-btn ${fullPanel ? "active" : "secondary"}`}
+                onClick={() => setFullPanel((p) => !p)}
+                title="Muestra el panel y mapa en altura expandida sin cortes"
+              >
+                <Icon name="expand" size={14} />
+                <span>{fullPanel ? "Panel Expandido ✓" : "Mostrar Panel Completo"}</span>
+              </button>
+            )}
+
+            <button className="capture-action-btn primary" onClick={handleDownloadPng} disabled={isCapturing} title="Descarga imagen PNG nítida a resolución 2x Retina">
+              <Icon name="download" size={15} />
+              <span>{isCapturing ? "Capturando..." : "Descargar PNG (2x)"}</span>
+            </button>
+
+            <button className="capture-action-btn secondary" onClick={() => setToolbarHidden(true)} title="Oculta esta barra para tomar capturas manuales con tu herramienta del sistema (tecla 'C' para restaurar)">
+              <Icon name="eyeOff" size={15} />
+              <span>Ocultar (C)</span>
+            </button>
+          </div>
+        </aside>
+      )}
+
+      {/* Botón flotante discreto cuando la barra está oculta */}
+      {toolbarHidden && (
+        <button
+          className="capture-floating-trigger"
+          onClick={() => setToolbarHidden(false)}
+          title="Mostrar asistente de capturas (también puedes presionar la tecla 'C')"
+        >
+          <Icon name="camera" size={16} />
+          <span>Asistente de Capturas (C)</span>
+        </button>
+      )}
+
+      {/* Feedback toast de descarga exitosa */}
+      {downloadSuccess && (
+        <div style={{ position: "fixed", top: 18, right: 18, zIndex: 10000, background: "var(--safe)", color: "white", padding: "10px 16px", borderRadius: 8, boxShadow: "0 6px 20px rgba(0,0,0,0.18)", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+          <Icon name="check" size={16} />
+          <span>{downloadSuccess}</span>
+        </div>
+      )}
+    </div>
+  );
 }
