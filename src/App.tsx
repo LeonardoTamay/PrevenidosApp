@@ -401,22 +401,303 @@ function PanelHeading({ title, subtitle, action }: { title: string; subtitle?: s
   return <div className="panel-heading"><div><h3>{title}</h3>{subtitle && <p>{subtitle}</p>}</div>{action}</div>;
 }
 
-function MapCanvas({ reports: shownReports, selected, onSelect, compact = false }: { reports: Report[]; selected: Report | null; onSelect: (r: Report) => void; compact?: boolean }) {
+function MapCanvas({
+  reports: shownReports,
+  selected,
+  onSelect,
+  compact = false,
+}: {
+  reports: Report[];
+  selected: Report | null;
+  onSelect: (r: Report) => void;
+  compact?: boolean;
+}) {
   const [zoom, setZoom] = useState(1);
-  return <div className={`map-canvas ${compact ? "compact" : ""}`}>
-    <div className="map-inner" style={{ transform: `scale(${zoom})`, transformOrigin: "center center", transition: "transform .2s" }}>
-      <div className="map-grid" />
-      <svg className="map-roads" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true">
-        <path className="water" d="M0 0h145c35 70 10 135 54 201 50 75 19 151 63 220 34 53 20 121 56 179H0Z" />
-        <path className="district" d="M260 56 434 32l98 104-50 118-202-18Z" /><path className="district" d="m532 136 198-60 126 109-82 143-292-74Z" /><path className="district" d="m280 236 202 18 64 145-116 142-168-120Z" /><path className="district" d="m482 254 292 74 112 173-340-102Z" />
-        <path className="main-road" d="M166 530C311 413 408 354 521 288S736 169 970 124" /><path className="main-road" d="M240 77c127 98 236 175 356 289s185 153 338 207" /><path className="road" d="M196 332c206-31 414 12 719 12M357 22c32 150 63 331 47 555M695 35c-18 144-39 294-21 519M242 185c205 49 444 44 678 0" />
-      </svg>
-      <span className="map-label label-lima">CERCADO<br />DE LIMA</span><span className="map-label label-brena">BREÑA</span><span className="map-label label-victoria">LA VICTORIA</span><span className="map-label label-miguel">SAN MIGUEL</span><span className="map-label label-borja">SAN BORJA</span>
-      {shownReports.map((r) => <button key={r.id} aria-label={`${r.id}, ${r.state}`} className={`map-marker ${r.state === "A salvo" ? "safe" : "danger"} ${selected?.id === r.id ? "selected" : ""}`} style={{ left: `${r.x}%`, top: `${r.y}%` }} onClick={() => onSelect(r)}><Icon name={r.state === "A salvo" ? "check" : "alert"} size={compact ? 13 : 15} /></button>)}
-      {!compact && <><button className="node-marker n1" aria-label="Nodo comunitario NOD-LIM-01"><Icon name="network" size={15} /></button><button className="node-marker n2" aria-label="Nodo comunitario NOD-LIM-02"><Icon name="network" size={15} /></button></>}
+
+  return (
+    <div className={`map-canvas ${compact ? "compact" : ""}`}>
+      <div
+        className="map-inner"
+        style={{
+          transform: `scale(${zoom})`,
+          transformOrigin: "center center",
+          transition: "transform .2s ease-out",
+        }}
+      >
+        <svg
+          className="map-roads"
+          viewBox="0 0 1000 600"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          style={{ width: "100%", height: "100%", display: "block" }}
+        >
+          <defs>
+            <linearGradient id="oceanGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#bfdbfe" />
+              <stop offset="85%" stopColor="#dbeafe" />
+              <stop offset="100%" stopColor="#eff6ff" />
+            </linearGradient>
+            <pattern id="gridPattern" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#e2e8f0" strokeWidth="0.8" opacity="0.6" />
+            </pattern>
+          </defs>
+
+          {/* Mainland background - warm light slate, NEVER black */}
+          <rect width="1000" height="600" fill="#f8fafc" stroke="none" />
+          <rect width="1000" height="600" fill="url(#gridPattern)" stroke="none" />
+
+          {/* West: Pacific Ocean (Océano Pacífico) */}
+          <path
+            fill="url(#oceanGrad)"
+            stroke="#93c5fd"
+            strokeWidth="2"
+            d="M0,0 L160,0 Q145,90 120,160 Q80,205 65,225 Q75,250 170,255 Q210,340 245,435 Q285,515 330,600 L0,600 Z"
+          />
+
+          {/* Ocean wave textures */}
+          <path
+            fill="none"
+            stroke="#93c5fd"
+            strokeWidth="1.5"
+            strokeDasharray="10 14"
+            opacity="0.7"
+            d="M 20,80 Q 60,70 100,85 M 30,190 Q 55,180 75,195 M 40,320 Q 85,310 130,325 M 60,460 Q 110,445 160,465 M 90,540 Q 150,525 210,545"
+          />
+
+          {/* Coastline sand / cliff buffer */}
+          <path
+            fill="none"
+            stroke="#fde68a"
+            strokeWidth="4"
+            opacity="0.8"
+            d="M160,0 Q145,90 120,160 Q80,205 65,225 Q75,250 170,255 Q210,340 245,435 Q285,515 330,600"
+          />
+
+          {/* Ocean Typography */}
+          <text
+            x="65"
+            y="390"
+            transform="rotate(-90 65 390)"
+            fill="#3b82f6"
+            fontSize="12"
+            fontWeight="700"
+            letterSpacing="6"
+            opacity="0.85"
+            style={{ textAnchor: "middle", fontFamily: "Inter, sans-serif" }}
+          >
+            OCÉANO PACÍFICO
+          </text>
+
+          {/* Districts (Polygons with explicit inline fills & strokes to prevent black rendering) */}
+          {/* Callao / Bellavista */}
+          <polygon
+            points="160,0 310,0 325,140 170,255 65,225 120,160"
+            fill="#f1f5f9"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+          {/* Cercado de Lima */}
+          <polygon
+            points="310,0 540,0 570,130 475,215 370,180 325,140"
+            fill="#ffffff"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+          {/* Rímac / SJL */}
+          <polygon
+            points="540,0 820,0 850,90 570,130"
+            fill="#f8fafc"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+          {/* Breña */}
+          <polygon
+            points="370,180 445,195 435,270 360,260"
+            fill="#f1f5f9"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+          {/* San Miguel / Pueblo Libre */}
+          <polygon
+            points="170,255 325,140 370,180 360,260 345,340 215,355"
+            fill="#ffffff"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+          {/* Jesús María / Lince */}
+          <polygon
+            points="360,260 435,270 480,285 450,380 345,340"
+            fill="#ffffff"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+          {/* La Victoria */}
+          <polygon
+            points="475,215 570,130 635,170 610,360 480,330 445,195"
+            fill="#f8fafc"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+          {/* Magdalena / San Isidro */}
+          <polygon
+            points="215,355 345,340 450,380 415,510 275,495 245,435"
+            fill="#f1f5f9"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+          {/* Miraflores / Surquillo */}
+          <polygon
+            points="275,495 415,510 460,530 430,600 330,600"
+            fill="#ffffff"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+          {/* San Borja */}
+          <polygon
+            points="480,330 610,360 670,410 650,560 460,530 450,380"
+            fill="#ffffff"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+          {/* Ate / Santa Anita */}
+          <polygon
+            points="570,130 850,90 930,240 870,420 670,410 635,170"
+            fill="#f8fafc"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+          {/* Santiago de Surco */}
+          <polygon
+            points="670,410 870,420 950,580 650,600 650,560"
+            fill="#f1f5f9"
+            stroke="#cbd5e1"
+            strokeWidth="1.5"
+          />
+
+          {/* Green parks */}
+          <rect x="230" y="275" width="44" height="32" rx="4" fill="#dcfce7" stroke="#86efac" strokeWidth="1" />
+          <polygon points="380,285 415,290 410,335 375,330" fill="#dcfce7" stroke="#86efac" strokeWidth="1" />
+          <rect x="450" y="235" width="34" height="24" rx="3" fill="#dcfce7" stroke="#86efac" strokeWidth="1" />
+          <rect x="560" y="440" width="46" height="34" rx="4" fill="#dcfce7" stroke="#86efac" strokeWidth="1" />
+
+          {/* Secondary streets */}
+          <path
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="2.5"
+            d="M 195,300 L 350,290 M 260,190 L 380,200 M 340,110 L 490,120 M 420,320 L 590,340 M 330,420 L 620,440 M 240,180 L 260,360 M 360,70 L 350,470 M 520,60 L 510,500 M 640,180 L 630,550 M 740,120 L 730,480"
+          />
+
+          {/* Primary Avenues / Highways */}
+          {/* Av. Javier Prado */}
+          <path
+            fill="none"
+            stroke="#fbbf24"
+            strokeWidth="4.5"
+            strokeLinecap="round"
+            d="M 215,355 Q 345,340 450,380 T 670,410 T 890,390"
+          />
+          {/* Vía Expresa */}
+          <path
+            fill="none"
+            stroke="#ea580c"
+            strokeWidth="4.5"
+            strokeLinecap="round"
+            d="M 440,170 L 460,280 L 440,430 L 420,530 L 390,600"
+          />
+          <path
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="1.5"
+            strokeDasharray="6 4"
+            d="M 440,170 L 460,280 L 440,430 L 420,530 L 390,600"
+          />
+          {/* Panamericana */}
+          <path
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="4"
+            d="M 520,0 L 500,180 L 550,320 L 580,480 L 610,600"
+          />
+          {/* Costa Verde */}
+          <path
+            fill="none"
+            stroke="#0284c7"
+            strokeWidth="2.5"
+            strokeDasharray="5 3"
+            d="M 170,255 Q 210,340 245,435 Q 285,515 330,600"
+          />
+        </svg>
+
+        {/* District Overlays */}
+        <span className="map-label label-lima">CERCADO DE LIMA</span>
+        <span className="map-label label-brena">BREÑA</span>
+        <span className="map-label label-victoria">LA VICTORIA</span>
+        <span className="map-label label-miguel">SAN MIGUEL</span>
+        <span className="map-label label-borja">SAN BORJA</span>
+        <span className="map-label label-ate">ATE</span>
+        <span className="map-label label-callao">CALLAO</span>
+
+        {/* Report Markers */}
+        {shownReports.map((r) => {
+          const isSelected = selected?.id === r.id;
+          return (
+            <button
+              key={r.id}
+              type="button"
+              aria-label={`${r.id}, ${r.state} en ${r.location}`}
+              title={`${r.id}: ${r.state} (${r.location})`}
+              className={`map-marker ${r.state === "A salvo" ? "safe" : "danger"} ${isSelected ? "selected" : ""}`}
+              style={{ left: `${r.x}%`, top: `${r.y}%` }}
+              onClick={() => onSelect(r)}
+            >
+              <Icon name={r.state === "A salvo" ? "check" : "alert"} size={compact ? 13 : 15} />
+            </button>
+          );
+        })}
+
+        {/* Node Markers */}
+        {!compact && (
+          <>
+            <button
+              type="button"
+              className="node-marker n1"
+              title="Nodo comunitario NOD-LIM-01 (San Miguel)"
+              aria-label="Nodo comunitario NOD-LIM-01"
+            >
+              <Icon name="network" size={15} />
+            </button>
+            <button
+              type="button"
+              className="node-marker n2"
+              title="Nodo comunitario NOD-LIM-02 (La Victoria)"
+              aria-label="Nodo comunitario NOD-LIM-02"
+            >
+              <Icon name="network" size={15} />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Cartographic UI Tools */}
+      {!compact && (
+        <>
+          <div className="zoom-controls">
+            <button aria-label="Acercar mapa" onClick={() => setZoom((z) => Math.min(+(z + 0.35).toFixed(2), 2.5))}>+</button>
+            <button aria-label="Alejar mapa" onClick={() => setZoom((z) => Math.max(+(z - 0.35).toFixed(2), 1))}>−</button>
+          </div>
+          <div className="map-simulation-label">
+            <Icon name="info" size={14} />
+            <span>Lima Metropolitana · WGS84 simulado</span>
+          </div>
+          <div className="map-scale-bar" aria-hidden="true">
+            <span className="scale-line" />
+            <span className="scale-text">2 km</span>
+          </div>
+        </>
+      )}
     </div>
-    {!compact && <><div className="zoom-controls"><button aria-label="Acercar" onClick={() => setZoom((z) => Math.min(+(z + 0.35).toFixed(2), 2.5))}>+</button><button aria-label="Alejar" onClick={() => setZoom((z) => Math.max(+(z - 0.35).toFixed(2), 1))}>−</button></div><div className="map-simulation-label"><Icon name="info" size={14} /> Mapa simulado · coordenadas ficticias</div></>}
-  </div>;
+  );
 }
 
 type FilterProps = {
@@ -436,20 +717,97 @@ function MapFilters({ filters, setters, clearFilters }: FilterProps) {
   </section>;
 }
 
-function MapView({ filtered, selected, setSelected, filters, setters, clearFilters }: { filtered: Report[]; selected: Report | null; setSelected: (r: Report | null) => void } & FilterProps) {
+function MapView({
+  filtered,
+  selected,
+  setSelected,
+  filters,
+  setters,
+  clearFilters,
+}: {
+  filtered: Report[];
+  selected: Report | null;
+  setSelected: (r: Report | null) => void;
+} & FilterProps) {
   const geoReports = filtered.filter((r) => r.coords);
-  return <>
-    <div className="workspace-intro"><div><span className="eyebrow">VISTA OPERATIVA PRINCIPAL</span><h2>Mapa de reportes</h2><p>Distribución espacial de reportes con ubicación ficticia disponible.</p></div><div className="map-count"><strong>{geoReports.length}</strong><span>marcadores visibles</span></div></div>
-    <MapFilters filters={filters} setters={setters} clearFilters={clearFilters} />
-    <div className="map-layout">
-      <section className="panel map-main-panel">
-        <div className="map-legend"><span><i className="safe" /> A salvo</span><span><i className="danger" /> Necesita ayuda</span><span><i className="pending" /> Pendiente</span><span><i className="node" /> Nodo comunitario</span></div>
-        <MapCanvas reports={geoReports} selected={selected} onSelect={setSelected} />
+
+  return (
+    <>
+      <div className="workspace-intro">
+        <div>
+          <span className="eyebrow">VISTA OPERATIVA PRINCIPAL</span>
+          <h2>Mapa de reportes</h2>
+          <p>Distribución espacial de reportes georreferenciados en la red comunitaria.</p>
+        </div>
+        <div className="map-count">
+          <strong>{geoReports.length}</strong>
+          <span>marcadores en pantalla</span>
+        </div>
+      </div>
+
+      <MapFilters filters={filters} setters={setters} clearFilters={clearFilters} />
+
+      <div className="map-layout">
+        <section className="panel map-main-panel">
+          <div className="map-legend">
+            <span><i className="safe" /> A salvo</span>
+            <span><i className="danger" /> Necesita ayuda</span>
+            <span><i className="pending" /> Pendiente</span>
+            <span><i className="node" /> Nodo comunitario</span>
+          </div>
+          <MapCanvas reports={geoReports} selected={selected} onSelect={setSelected} />
+        </section>
+
+        <aside className="panel map-detail">
+          {selected ? (
+            <ReportDetail report={selected} onClose={() => setSelected(null)} />
+          ) : (
+            <div className="empty-detail">
+              <div className="empty-detail-badge">
+                <Icon name="location" size={26} />
+              </div>
+              <h3>Detalle del reporte</h3>
+              <p>Selecciona un marcador en el mapa para auditar la ficha técnica.</p>
+              <div className="empty-detail-hints">
+                <div className="empty-hint-row">
+                  <span className="hint-pill safe"><Icon name="check" size={12} /></span>
+                  <div>
+                    <strong>Estoy a salvo</strong>
+                    <small>Poblador sin lesiones</small>
+                  </div>
+                </div>
+                <div className="empty-hint-row">
+                  <span className="hint-pill danger"><Icon name="alert" size={12} /></span>
+                  <div>
+                    <strong>Necesita ayuda</strong>
+                    <small>Atención médica o auxilio</small>
+                  </div>
+                </div>
+                <div className="empty-hint-row">
+                  <span className="hint-pill node"><Icon name="network" size={12} /></span>
+                  <div>
+                    <strong>Nodo de enlace</strong>
+                    <small>Punto receptor de malla</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </aside>
+      </div>
+
+      <section className="panel map-list">
+        <PaginatedReportTable
+          reports={filtered}
+          selected={selected}
+          onSelect={setSelected}
+          pageSize={5}
+          title="Reportes asociados"
+          subtitle={`${filtered.length} registros coinciden con los filtros aplicados`}
+        />
       </section>
-      <aside className="panel map-detail">{selected ? <ReportDetail report={selected} onClose={() => setSelected(null)} /> : <div className="empty-detail"><Icon name="location" size={30} /><h3>Selecciona un marcador</h3><p>Consulta aquí los datos del reporte.</p></div>}</aside>
-    </div>
-    <section className="panel map-list"><PanelHeading title="Reportes asociados" subtitle={`${filtered.length} registros coinciden con los filtros`} /><ReportRows reports={filtered.slice(0, 4)} selected={selected} onSelect={setSelected} /></section>
-  </>;
+    </>
+  );
 }
 
 function stateTone(report: Report) { return report.state === "A salvo" ? "safe" : "danger"; }
@@ -457,32 +815,265 @@ function transmissionTone(value: Transmission): "safe" | "pending" | "info" | "n
 function validationTone(value: Report["validation"]): "safe" | "pending" | "neutral" { return value === "Verificado" ? "safe" : value === "En revisión" ? "pending" : "neutral"; }
 
 function ReportDetail({ report, onClose }: { report: Report; onClose?: () => void }) {
-  return <div className="detail-content">
-    <div className="detail-head"><div><span className="eyebrow">Detalle del reporte</span><h3>{report.id}</h3></div>{onClose && <button onClick={onClose} aria-label="Cerrar detalle"><Icon name="close" /></button>}</div>
-    <StatusPill tone={stateTone(report)}>{report.state}</StatusPill>
-    <dl><div><dt>Fecha y hora</dt><dd>{report.date}</dd></div><div><dt>Fuente</dt><dd>{report.source}</dd></div><div><dt>Transmisión</dt><dd><StatusPill tone={transmissionTone(report.transmission)}>{report.transmission}</StatusPill></dd></div>{report.category && <div><dt>Categoría de ayuda</dt><dd>{report.category}</dd></div>}<div><dt>Ubicación</dt><dd>{report.location}<small>{report.coords ? `${report.coords[0]}, ${report.coords[1]}` : "Sin coordenadas"}</small></dd></div><div><dt>Tipo de ubicación</dt><dd>{report.locationType}</dd></div><div><dt>Nodo de origen</dt><dd>{report.node}</dd></div><div><dt>Validación</dt><dd><StatusPill tone={validationTone(report.validation)}>{report.validation}</StatusPill></dd></div></dl>
-    <div className="detail-note"><Icon name="info" /><span>Información ficticia para demostración. No contiene datos personales.</span></div>
-  </div>;
+  return (
+    <div className="detail-content">
+      <div className="detail-head">
+        <div>
+          <span className="eyebrow">Ficha técnica</span>
+          <h3>{report.id}</h3>
+        </div>
+        {onClose && (
+          <button onClick={onClose} aria-label="Cerrar detalle" title="Cerrar ficha">
+            <Icon name="close" size={18} />
+          </button>
+        )}
+      </div>
+
+      <div className="detail-status-row">
+        <StatusPill tone={stateTone(report)}>{report.state}</StatusPill>
+        <StatusPill tone={validationTone(report.validation)}>{report.validation}</StatusPill>
+      </div>
+
+      <dl>
+        <div>
+          <dt>Fecha y hora</dt>
+          <dd className="tabular-nums">{report.date}</dd>
+        </div>
+        <div>
+          <dt>Fuente de origen</dt>
+          <dd>{report.source}</dd>
+        </div>
+        <div>
+          <dt>Estado de transmisión</dt>
+          <dd><StatusPill tone={transmissionTone(report.transmission)}>{report.transmission}</StatusPill></dd>
+        </div>
+        {report.category && (
+          <div>
+            <dt>Categoría de requerimiento</dt>
+            <dd style={{ color: "var(--danger)", fontWeight: 700 }}>{report.category}</dd>
+          </div>
+        )}
+        <div>
+          <dt>Ubicación reportada</dt>
+          <dd>
+            <strong>{report.location}</strong>
+            <small>{report.coords ? `${report.coords[0]}, ${report.coords[1]}` : "Sin coordenadas precisas"}</small>
+          </dd>
+        </div>
+        <div>
+          <dt>Tipo de fijación</dt>
+          <dd>{report.locationType}</dd>
+        </div>
+        <div>
+          <dt>Nodo comunitario</dt>
+          <dd className="tabular-nums">{report.node}</dd>
+        </div>
+      </dl>
+
+      <div className="detail-note">
+        <Icon name="info" />
+        <span>Datos ficticios para demostración académica del COEN.</span>
+      </div>
+
+      {onClose && (
+        <div style={{ marginTop: 14 }}>
+          <Button variant="ghost" icon="close" onClick={onClose} style={{ width: "100%" }}>
+            Deseleccionar reporte
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 }
 
-function ReportRows({ reports: rows, selected, onSelect }: { reports: Report[]; selected: Report | null; onSelect: (r: Report) => void }) {
-  return <div className="report-table-wrap"><table className="report-table"><thead><tr><th>ID</th><th>Fecha y hora</th><th>Estado declarado</th><th>Ubicación</th><th>Fuente</th><th>Transmisión</th><th>Validación</th><th /></tr></thead><tbody>{rows.map((r) => <tr key={r.id} className={selected?.id === r.id ? "selected" : ""} onClick={() => onSelect(r)}><td><strong>{r.id}</strong></td><td className="tabular-nums">{r.date.replace("17 jun 2025 · ", "")}</td><td><StatusPill tone={stateTone(r)}>{r.state}</StatusPill></td><td><span className="location-cell"><Icon name="location" size={15} />{r.location}</span></td><td>{r.source}</td><td><StatusPill tone={transmissionTone(r.transmission)}>{r.transmission}</StatusPill></td><td><StatusPill tone={validationTone(r.validation)}>{r.validation}</StatusPill></td><td><button aria-label={`Ver ${r.id}`} onClick={(e) => { e.stopPropagation(); onSelect(r); }}><Icon name="chevron" size={17} /></button></td></tr>)}</tbody></table></div>;
+function PaginatedReportTable({
+  reports: list,
+  selected,
+  onSelect,
+  pageSize = 5,
+  title,
+  subtitle,
+}: {
+  reports: Report[];
+  selected: Report | null;
+  onSelect: (r: Report) => void;
+  pageSize?: number;
+  title?: string;
+  subtitle?: string;
+}) {
+  const [page, setPage] = useState(1);
+
+  // Reset page whenever list length changes
+  useEffect(() => {
+    setPage(1);
+  }, [list.length]);
+
+  const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIdx = (currentPage - 1) * pageSize;
+  const currentRows = list.slice(startIdx, startIdx + pageSize);
+  const startCount = list.length === 0 ? 0 : startIdx + 1;
+  const endCount = Math.min(startIdx + pageSize, list.length);
+
+  return (
+    <>
+      {title && <PanelHeading title={title} subtitle={subtitle} />}
+      <div className="report-table-wrap">
+        <table className="report-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Fecha y hora</th>
+              <th>Estado declarado</th>
+              <th>Ubicación</th>
+              <th>Fuente</th>
+              <th>Transmisión</th>
+              <th>Validación</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {currentRows.length === 0 ? (
+              <tr>
+                <td colSpan={8} style={{ textAlign: "center", padding: "28px", color: "var(--muted)" }}>
+                  No se encontraron reportes con los criterios seleccionados.
+                </td>
+              </tr>
+            ) : (
+              currentRows.map((r) => (
+                <tr
+                  key={r.id}
+                  className={selected?.id === r.id ? "selected" : ""}
+                  onClick={() => onSelect(r)}
+                >
+                  <td><strong>{r.id}</strong></td>
+                  <td className="tabular-nums">{r.date.replace("17 jun 2025 · ", "")}</td>
+                  <td><StatusPill tone={stateTone(r)}>{r.state}</StatusPill></td>
+                  <td><span className="location-cell"><Icon name="location" size={15} />{r.location}</span></td>
+                  <td>{r.source}</td>
+                  <td><StatusPill tone={transmissionTone(r.transmission)}>{r.transmission}</StatusPill></td>
+                  <td><StatusPill tone={validationTone(r.validation)}>{r.validation}</StatusPill></td>
+                  <td>
+                    <button aria-label={`Ver ${r.id}`} onClick={(e) => { e.stopPropagation(); onSelect(r); }}>
+                      <Icon name="chevron" size={17} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="table-footer">
+        <span>Mostrando {startCount} a {endCount} de {list.length} registros</span>
+        <div className="pagination-controls">
+          <Button
+            variant="secondary"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage <= 1}
+          >
+            Anterior
+          </Button>
+          <span className="page-number" title={`Página ${currentPage} de ${totalPages}`}>
+            {currentPage}
+          </span>
+          <span className="page-total">de {totalPages}</span>
+          <Button
+            variant="secondary"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages}
+          >
+            Siguiente
+          </Button>
+        </div>
+      </div>
+    </>
+  );
 }
 
-function ReportsView({ filtered, selected, setSelected, status, setStatus }: { filtered: Report[]; selected: Report | null; setSelected: (r: Report | null) => void; status: string; setStatus: (v: string) => void }) {
+function ReportsView({
+  filtered,
+  selected,
+  setSelected,
+  status,
+  setStatus,
+}: {
+  filtered: Report[];
+  selected: Report | null;
+  setSelected: (r: Report | null) => void;
+  status: string;
+  setStatus: (v: string) => void;
+}) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("Más recientes");
-  const matched = filtered.filter((r) => r.id.toLowerCase().includes(query.toLowerCase()));
-  const shown = sort === "Más recientes" ? matched : [...matched].reverse();
-  return <>
-    <div className="workspace-intro"><div><span className="eyebrow">REGISTRO CONSOLIDADO</span><h2>Reportes ciudadanos</h2><p>Distingue el estado declarado, la transmisión y la validación operativa.</p></div><StatusPill tone="neutral">{reports.length} registros ficticios</StatusPill></div>
-    <section className="panel reports-panel">
-      <div className="table-toolbar"><label className="search-field"><Icon name="search" /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por ID" /><span>Buscar</span></label><Select label="Estado declarado" value={status} onChange={setStatus}><option>Todos</option><option>A salvo</option><option>Necesita ayuda</option></Select><Select label="Ordenar" value={sort} onChange={setSort}><option>Más recientes</option><option>Más antiguos</option></Select></div>
-      <ReportRows reports={shown} selected={selected} onSelect={setSelected} />
-      <div className="table-footer"><span>Mostrando {shown.length} de {reports.length} registros</span><div><Button variant="secondary" disabled>Anterior</Button><span className="page-number">1</span><Button variant="secondary" disabled>Siguiente</Button></div></div>
-    </section>
-    {selected && <div className="detail-drawer"><button className="drawer-overlay" onClick={() => setSelected(null)} aria-label="Cerrar detalle" /><aside><ReportDetail report={selected} onClose={() => setSelected(null)} /></aside></div>}
-  </>;
+
+  const matched = useMemo(() => {
+    return filtered.filter(
+      (r) =>
+        r.id.toLowerCase().includes(query.toLowerCase()) ||
+        r.location.toLowerCase().includes(query.toLowerCase())
+    );
+  }, [filtered, query]);
+
+  const shown = useMemo(() => {
+    return sort === "Más recientes" ? matched : [...matched].reverse();
+  }, [matched, sort]);
+
+  return (
+    <>
+      <div className="workspace-intro">
+        <div>
+          <span className="eyebrow">REGISTRO CONSOLIDADO</span>
+          <h2>Reportes ciudadanos</h2>
+          <p>Distingue el estado declarado, la transmisión y la validación operativa.</p>
+        </div>
+        <StatusPill tone="neutral">{reports.length} registros ficticios</StatusPill>
+      </div>
+
+      <section className="panel reports-panel">
+        <div className="table-toolbar">
+          <label className="search-field">
+            <Icon name="search" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar por ID o distrito"
+            />
+            <span>Buscar</span>
+          </label>
+          <Select label="Estado declarado" value={status} onChange={setStatus}>
+            <option>Todos</option>
+            <option>A salvo</option>
+            <option>Necesita ayuda</option>
+          </Select>
+          <Select label="Ordenar" value={sort} onChange={setSort}>
+            <option>Más recientes</option>
+            <option>Más antiguos</option>
+          </Select>
+        </div>
+
+        <PaginatedReportTable
+          reports={shown}
+          selected={selected}
+          onSelect={setSelected}
+          pageSize={5}
+        />
+      </section>
+
+      {selected && (
+        <div className="detail-drawer">
+          <button
+            className="drawer-overlay"
+            onClick={() => setSelected(null)}
+            aria-label="Cerrar detalle"
+          />
+          <aside>
+            <ReportDetail report={selected} onClose={() => setSelected(null)} />
+          </aside>
+        </div>
+      )}
+    </>
+  );
 }
 
 function NodesView() {
